@@ -1,0 +1,13 @@
+name: ff
+channels:
+  - pytorch
+  - nvidia
+  - conda-forge
+dependencies:
+  - python=3.9
+  - pytorch
+  - torchvision
+  - pytorch-cuda=11.7
+  - pip:
+      - pytorch-lightning
+      - matplotlib
