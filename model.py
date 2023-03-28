@@ -11,7 +11,7 @@ class PositionalEncoding(nn.Module):
         super().__init__()
 
         delta = 2 / (length - 1)
-        pe = torch.arange(-1, 1 + delta, delta).unsqueeze(-1)
+        pe = torch.arange(-1., 1. + delta/2, delta).unsqueeze(-1)
         self.register_buffer("pe", pe)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -69,7 +69,7 @@ class MNISTSupervisedModel(pl.LightningModule):
     def __init__(
         self,
         num_layers: int = 2,
-        features: int = 2000,
+        nhead: int = 1,
         lr: float = 0.1,
         threshold: float = 2.0,
     ):
@@ -77,22 +77,30 @@ class MNISTSupervisedModel(pl.LightningModule):
         self._lr = lr
         self._threshold = threshold
 
+        self._pe = PositionalEncoding(length=28 * 28)
+
         # first layer keeps length information
         layers = [
-            FFLayer(in_features=28 * 28, out_features=features, only_direction=False)
+            TransformerLayer(nhead=nhead, dim_feedforward=2048, only_direction=False)
         ]
         for _ in range(num_layers - 1):
-            layers.append(FFLayer(in_features=features, out_features=features))
+            layers.append(TransformerLayer(nhead=nhead))
         self._net = nn.Sequential(*layers)
 
         # activate manual optimization
         self.automatic_optimization = False
 
     def forward(self, x_pos, x_neg, optimize: bool = False) -> float:
+        # x_pos, x_neg = self._pe(x_pos), self._pe(x_neg)
         loss_tot = 0
-        for layer, optimizer in zip(self._net, self.optimizers()):
-            h_pos = layer(x_pos).pow(2).mean(1)
-            h_neg = layer(x_neg).pow(2).mean(1)
+
+        optimizers = self.optimizers()
+        if not isinstance(optimizers, list):
+            optimizers = [optimizers]
+
+        for layer, optimizer in zip(self._net, optimizers):
+            h_pos = layer(x_pos).pow(2).sum(-1).mean(1)
+            h_neg = layer(x_neg).pow(2).sum(-1).mean(1)
             loss = self._compute_loss(h_pos, h_neg)
 
             if optimize:
@@ -145,10 +153,10 @@ class MNISTSupervisedModel(pl.LightningModule):
             one_hot_encoded_target[:, i] = 1.0
             image[:, :10] = one_hot_encoded_target
 
-            ys = image
+            ys = self._pe(image)
             for layer in self._net:
                 ys = layer(ys)
-                goodness[:, i] += ys.square().mean(1)
+                goodness[:, i] += ys.square().sum(-1).mean(1)
 
         return torch.argmax(goodness, dim=1)
 
