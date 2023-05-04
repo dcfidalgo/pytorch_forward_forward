@@ -1,5 +1,7 @@
 # pyff
 
+**A Pytorch-Lightning implementation of the Forward-Forward algorithm.**
+
 This started as a fork of https://github.com/mohammadpz/pytorch_forward_forward !!
 
 Below is my understanding of the FF algorithm presented at [Geoffrey Hinton's talk at NeurIPS 2022](https://www.cs.toronto.edu/~hinton/FFA13.pdf).\
